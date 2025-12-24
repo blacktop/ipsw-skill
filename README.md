@@ -87,7 +87,8 @@ Once installed, Claude will automatically use this skill when you ask about Appl
 
 ```
 .claude-plugin/
-└── plugin.json                 # Plugin metadata
+├── plugin.json                 # Plugin metadata
+└── marketplace.json            # Marketplace metadata
 skills/
 └── ipsw/
     ├── SKILL.md                # Core workflows and quick reference
