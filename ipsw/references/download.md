@@ -2,6 +2,68 @@
 
 Complete reference for downloading and extracting Apple firmware with ipsw.
 
+## Which Download Command Do I Need?
+
+```
+What do you want to download?
+│
+├─► iOS/iPadOS/tvOS/watchOS firmware
+│   │
+│   ├─► Full restore image (.ipsw file)
+│   │   └─► ipsw download ipsw
+│   │
+│   ├─► Over-the-air update (smaller, delta updates)
+│   │   └─► ipsw download ota
+│   │
+│   └─► Just the kernel or dyld_shared_cache (fastest)
+│       └─► ipsw download ipsw --kernel --dyld
+│           (extracts during download, no full IPSW saved)
+│
+├─► macOS installer
+│   └─► ipsw download macos
+│
+├─► Kernel Development Kit (debug symbols, type info)
+│   └─► ipsw download kdk
+│
+├─► Apple open source (xnu, dyld, etc.)
+│   └─► ipsw download git <project>
+│
+├─► App Store IPA
+│   └─► ipsw download ipa
+│
+├─► Firmware decryption keys
+│   └─► ipsw download keys
+│
+└─► SHSH blobs / signing status
+    └─► ipsw download tss
+```
+
+### Quick Decision Guide
+
+| I want to... | Command |
+|--------------|---------|
+| Get latest iOS kernel for research | `ipsw download ipsw --device <ID> --latest --kernel` |
+| Get dyld_shared_cache for class-dump | `ipsw download ipsw --device <ID> --latest --dyld` |
+| Download full IPSW for restore | `ipsw download ipsw --device <ID> --latest` |
+| Get beta/developer firmware | `ipsw download ota --device <ID> --beta` |
+| Analyze macOS internals | `ipsw download macos --latest` |
+| Get kernel debug symbols | `ipsw download kdk --latest` |
+| Read xnu source code | `ipsw download git xnu` |
+| Check if firmware is still signed | `ipsw download tss --device <ID> --build <BUILD>` |
+
+### IPSW vs OTA: When to Use Which
+
+| Criteria | `download ipsw` | `download ota` |
+|----------|-----------------|----------------|
+| File size | Larger (full image) | Smaller (delta) |
+| Contains full filesystem | Yes | Partial |
+| Best for kernel extraction | Yes | Yes |
+| Best for dyld_shared_cache | Yes | Yes |
+| Beta/seed releases | Limited | Yes (`--beta`) |
+| Restore device | Yes | No |
+
+---
+
 ## Table of Contents
 - [IPSW Downloads](#ipsw-downloads)
 - [OTA Downloads](#ota-downloads)
