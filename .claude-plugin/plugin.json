@@ -1,0 +1,10 @@
+{
+  "name": "ipsw",
+  "version": "1.0.0",
+  "description": "Apple firmware and binary reverse engineering using the ipsw CLI tool",
+  "author": {
+    "name": "blacktop"
+  },
+  "repository": "https://github.com/blacktop/ipsw-skill",
+  "category": "development"
+}

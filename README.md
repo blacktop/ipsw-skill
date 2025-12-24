@@ -25,31 +25,47 @@ brew install blacktop/tap/ipsw
 
 ### Claude Code
 
-Install via the Claude Code marketplace:
+Install from the marketplace:
 
 ```bash
 claude /marketplace install blacktop/ipsw-skill
 ```
 
-Or install directly from GitHub:
+Or install as a plugin directly:
 
 ```bash
-claude /install-skill https://github.com/blacktop/ipsw-skill
+claude /install-plugin https://github.com/blacktop/ipsw-skill
+```
+
+Or install manually by cloning:
+
+```bash
+# User-wide (available in all projects)
+git clone https://github.com/blacktop/ipsw-skill ~/.claude/plugins/ipsw
+
+# Project-specific (check into your repo)
+git clone https://github.com/blacktop/ipsw-skill .claude/plugins/ipsw
 ```
 
 ### Codex CLI
 
-Install via the Codex marketplace:
+Use the built-in `$skill-installer` to install from GitHub:
 
-```bash
-codex /marketplace install blacktop/ipsw-skill
+```
+$skill-installer https://github.com/blacktop/ipsw-skill
 ```
 
-Or install directly:
+Or install manually by cloning to a skills directory:
 
 ```bash
-codex /install-skill https://github.com/blacktop/ipsw-skill
+# User-wide (available in all projects)
+git clone https://github.com/blacktop/ipsw-skill ~/.codex/skills/ipsw
+
+# Project-specific (check into your repo)
+git clone https://github.com/blacktop/ipsw-skill .codex/skills/ipsw
 ```
+
+> **Note**: Run Codex with `--enable skills` if skills aren't loading automatically.
 
 ## Usage Examples
 
@@ -70,15 +86,18 @@ Once installed, Claude will automatically use this skill when you ask about Appl
 ## Skill Contents
 
 ```
-ipsw/
-├── SKILL.md                    # Core workflows and quick reference
-└── references/
-    ├── dyld.md                 # dyld_shared_cache analysis commands
-    ├── macho.md                # Mach-O binary analysis commands
-    ├── kernel.md               # Kernel & KEXT analysis commands
-    ├── download.md             # Firmware download & extraction
-    ├── class-dump.md           # ObjC header dumping
-    └── entitlements.md         # Entitlements database & queries
+.claude-plugin/
+└── plugin.json                 # Plugin metadata
+skills/
+└── ipsw/
+    ├── SKILL.md                # Core workflows and quick reference
+    └── references/
+        ├── dyld.md             # dyld_shared_cache analysis commands
+        ├── macho.md            # Mach-O binary analysis commands
+        ├── kernel.md           # Kernel & KEXT analysis commands
+        ├── download.md         # Firmware download & extraction
+        ├── class-dump.md       # ObjC header dumping
+        └── entitlements.md     # Entitlements database & queries
 ```
 
 ## Resources
