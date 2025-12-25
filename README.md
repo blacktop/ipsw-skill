@@ -40,11 +40,14 @@ claude plugin install ipsw
 Or install manually by cloning:
 
 ```bash
+# Clone the repo
+git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
+
 # User-wide (available in all projects)
-git clone https://github.com/blacktop/ipsw-skill ~/.claude/plugins/ipsw
+mv /tmp/ipsw-skill/skills/ipsw ~/.claude/skills/ipsw
 
 # Project-specific (check into your repo)
-git clone https://github.com/blacktop/ipsw-skill .claude/plugins/ipsw
+mv /tmp/ipsw-skill/skills/ipsw .claude/skills/ipsw
 ```
 
 ### Codex CLI
@@ -62,10 +65,10 @@ Or install manually by copying the skill folder:
 git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
 
 # User-wide (available in all projects)
-cp -r /tmp/ipsw-skill/skills/ipsw ~/.codex/skills/
+mv /tmp/ipsw-skill/skills/ipsw ~/.codex/skills/
 
 # Or project-specific (check into your repo)
-cp -r /tmp/ipsw-skill/skills/ipsw .codex/skills/
+mv /tmp/ipsw-skill/skills/ipsw .codex/skills/
 ```
 
 > **Note**: Run Codex with `--enable skills` if skills aren't loading automatically.
