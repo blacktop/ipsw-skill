@@ -1,0 +1,5 @@
+{
+  "name": "ipsw-skill",
+  "description": "Apple firmware and binary reverse engineering skills using the ipsw CLI tool",
+  "version": "1.0.0"
+}

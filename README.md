@@ -73,6 +73,14 @@ mv /tmp/ipsw-skill/skills/ipsw .codex/skills/
 
 > **Note**: Run Codex with `--enable skills` if skills aren't loading automatically.
 
+### Gemini CLI
+
+Install the extension directly from GitHub:
+
+```bash
+gemini extensions install https://github.com/blacktop/ipsw-skill
+```
+
 ## Usage Examples
 
 Once installed, Claude will automatically use this skill when you ask about Apple reverse engineering tasks:
