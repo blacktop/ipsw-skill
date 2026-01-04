@@ -1,17 +1,19 @@
 # ipsw-skill
 
-A Claude Code skill for Apple firmware and binary reverse engineering using the [ipsw](https://github.com/blacktop/ipsw) CLI tool.
+An AI agent skill for Apple firmware and binary reverse engineering using the [ipsw](https://github.com/blacktop/ipsw) CLI tool.
+
+Supports **Claude Code**, **Codex CLI**, and **Gemini CLI**.
 
 ## What This Skill Provides
 
-This skill empowers Claude to assist with:
+This skill empowers AI agents to assist with:
 
-- **Disassembling functions** in dyld_shared_cache and Mach-O binaries
+- **Downloading/extracting firmware** - IPSWs, OTAs, kernelcaches, dyld_shared_cache
+- **Userspace reverse engineering** - DSC disassembly, symbol lookup, xrefs, string search
 - **Dumping Objective-C headers** from private frameworks
-- **Downloading IPSWs/OTAs** and extracting kernelcaches
-- **Analyzing entitlements** across iOS/macOS binaries
-- **KEXT extraction and analysis** from kernelcaches
-- **Tracking changes** between iOS/macOS versions
+- **Kernel & KEXT analysis** - extraction, syscalls, diffing between versions
+- **Entitlements research** - database queries, capability discovery
+- **Mach-O binary analysis** - signatures, entitlements, disassembly
 
 ## Installation
 
@@ -25,57 +27,50 @@ brew install blacktop/tap/ipsw
 
 ### Claude Code
 
-Install the marketplace:
+Install from marketplace:
 
 ```bash
 claude plugin marketplace add blacktop/ipsw-skill
-```
-
-Install the plugin:
-
-```bash
 claude plugin install ipsw
 ```
 
-Or install manually by cloning:
+Or install manually:
 
 ```bash
-# Clone the repo
 git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
 
 # User-wide (available in all projects)
-mv /tmp/ipsw-skill/skills/ipsw ~/.claude/skills/ipsw
+mv /tmp/ipsw-skill/skill ~/.claude/skills/ipsw
 
 # Project-specific (check into your repo)
-mv /tmp/ipsw-skill/skills/ipsw .claude/skills/ipsw
+mv /tmp/ipsw-skill/skill .claude/skills/ipsw
 ```
 
 ### Codex CLI
 
-Use the built-in `$skill-installer` to install from GitHub:
-
-```
-$skill-installer https://github.com/blacktop/ipsw-skill --path skills/ipsw
-```
-
-Or install manually by copying the skill folder:
+Use the built-in installer:
 
 ```bash
-# Clone the repo
+$skill-installer https://github.com/blacktop/ipsw-skill --path skill
+```
+
+Or install manually:
+
+```bash
 git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
 
-# User-wide (available in all projects)
-mv /tmp/ipsw-skill/skills/ipsw ~/.codex/skills/
+# User-wide
+mv /tmp/ipsw-skill/skill ~/.codex/skills/ipsw
 
-# Or project-specific (check into your repo)
-mv /tmp/ipsw-skill/skills/ipsw .codex/skills/
+# Project-specific
+mv /tmp/ipsw-skill/skill .codex/skills/ipsw
 ```
 
 > **Note**: Run Codex with `--enable skills` if skills aren't loading automatically.
 
 ### Gemini CLI
 
-Install the extension directly from GitHub:
+Install the extension directly:
 
 ```bash
 gemini extensions install https://github.com/blacktop/ipsw-skill
@@ -83,35 +78,39 @@ gemini extensions install https://github.com/blacktop/ipsw-skill
 
 ## Usage Examples
 
-Once installed, Claude will automatically use this skill when you ask about Apple reverse engineering tasks:
+Once installed, the agent will automatically use this skill for Apple RE tasks:
+
+> "Download the latest IPSW for iPhone 15 Pro and extract the kernel"
 
 > "Disassemble the _malloc function from the system dyld_shared_cache"
 
 > "Dump the Objective-C headers for SpringBoardServices"
 
-> "Download the latest IPSW for iPhone 15 Pro and extract the kernel"
-
 > "Find all binaries with the platform-application entitlement in iOS 18"
 
-> "Extract the sandbox KEXT from this kernelcache"
+> "What address is -[NSObject init] at in the DSC?"
 
-> "What classes in Security.framework handle keychain operations?"
+> "Find all xrefs to this function address"
 
-## Skill Contents
+## Contents
 
 ```
-.claude-plugin/
-└── marketplace.json            # Marketplace configuration
-skills/
-└── ipsw/
-    ├── SKILL.md                # Core workflows and quick reference
-    └── references/
-        ├── dyld.md             # dyld_shared_cache analysis commands
-        ├── macho.md            # Mach-O binary analysis commands
-        ├── kernel.md           # Kernel & KEXT analysis commands
-        ├── download.md         # Firmware download & extraction
-        ├── class-dump.md       # ObjC header dumping
-        └── entitlements.md     # Entitlements database & queries
+ipsw-skill/
+├── skill/                      # Claude Code / Codex skill
+│   ├── SKILL.md                # Main skill instructions
+│   └── references/
+│       ├── dyld.md             # DSC analysis (a2s, xref, dump, str)
+│       ├── download.md         # Firmware download & extraction
+│       ├── kernel.md           # Kernel & KEXT analysis
+│       ├── macho.md            # Mach-O binary analysis
+│       ├── class-dump.md       # ObjC header dumping
+│       └── entitlements.md     # Entitlements database & queries
+├── extension/                  # Gemini CLI extension resources
+│   └── references/             # (same reference files)
+├── GEMINI.md                   # Gemini extension instructions
+├── gemini-extension.json       # Gemini extension config
+└── .claude-plugin/
+    └── marketplace.json        # Claude marketplace config
 ```
 
 ## Resources
