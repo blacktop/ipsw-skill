@@ -82,6 +82,18 @@ Install the extension directly:
 gemini extensions install https://github.com/blacktop/ipsw-skill
 ```
 
+### Antigravity
+
+Install the skill manually:
+
+```bash
+# User-wide
+mv /tmp/ipsw-skill/skill ~/.gemini/antigravity/skills/ipsw
+
+# workspace-specific
+mv /tmp/ipsw-skill/skill <workspace-root>/.agent/skills/ipsw
+```
+
 ## Usage Examples
 
 Once installed, the agent will automatically use this skill for Apple RE tasks:
