@@ -25,6 +25,12 @@ Install the `ipsw` CLI tool:
 brew install blacktop/tap/ipsw
 ```
 
+### skills.sh
+
+```bash
+npx skills add https://github.com/blacktop/ipsw-skill --skill ipsw
+```
+
 ### Claude Code
 
 Install from marketplace:
