@@ -1,0 +1,7 @@
+{
+  "name": "ipsw-skill",
+  "keywords": ["pi-package"],
+  "pi": {
+    "skills": ["./skill"]
+  }
+}
