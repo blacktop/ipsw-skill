@@ -1,3 +1,5 @@
+[![Oathe Security](https://img.shields.io/endpoint?url=https%3A%2F%2Faudit-engine.oathe.ai%2Fapi%2Fbadge%2Fblacktop%2Fipsw-skill&style=flat&cacheSeconds=3600)](https://oathe.ai/report/blacktop/ipsw-skill)
+
 # ipsw-skill
 
 An AI agent skill for Apple firmware and binary reverse engineering using the [ipsw](https://github.com/blacktop/ipsw) CLI tool.
