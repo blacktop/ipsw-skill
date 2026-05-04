@@ -8,7 +8,7 @@ Complete reference for analyzing kernelcaches and kernel extensions with ipsw.
 - [KEXT Comparison](#kext-comparison)
 - [Syscalls & Mach Traps](#syscalls--mach-traps)
 - [MIG Subsystems](#mig-subsystems)
-- [Symbolication](#symbolication)
+- [Kernelcache Symbolication](#kernelcache-symbolication)
 - [CTF/DWARF Analysis](#ctfdwarf-analysis)
 - [Kernel Disassembly](#kernel-disassembly)
 
@@ -121,7 +121,9 @@ MIG (Mach Interface Generator) subsystems define IPC interfaces for kernel servi
 
 ---
 
-## Symbolication
+## Kernelcache Symbolication
+
+For symbolicating crash logs against an IPSW/DSC, use top-level `ipsw symbolicate` instead — see SKILL.md.
 
 **Symbolicate kernelcache:**
 ```bash
@@ -141,19 +143,19 @@ CTF (Compact C Type Format) and DWARF provide kernel type information useful for
 
 **Requires KDK (Kernel Development Kit)**
 
-**Download KDK:**
+**Download KDK for current host:**
 ```bash
-ipsw download kdk --version 13.0
+ipsw download kdk --host
 ```
 
 **Dump type info:**
 ```bash
-ipsw ctfdump KDK/kernel.development.t8101 task > task.h
+ipsw kernel ctfdump KDK/kernel.development.t8101 task > task.h
 ```
 
 **Dump all kernel types:**
 ```bash
-ipsw ctfdump KDK/kernel.development.t8101 --all
+ipsw kernel ctfdump KDK/kernel.development.t8101 --all
 ```
 
 **Diff struct between versions:**

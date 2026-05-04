@@ -46,10 +46,10 @@ Or install manually:
 git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
 
 # User-wide (available in all projects)
-mv /tmp/ipsw-skill/skill ~/.claude/skills/ipsw
+mv /tmp/ipsw-skill/ipsw ~/.claude/skills/ipsw
 
 # Project-specific (check into your repo)
-mv /tmp/ipsw-skill/skill .claude/skills/ipsw
+mv /tmp/ipsw-skill/ipsw .claude/skills/ipsw
 ```
 
 ### Codex CLI
@@ -57,7 +57,7 @@ mv /tmp/ipsw-skill/skill .claude/skills/ipsw
 Use the built-in installer:
 
 ```bash
-$skill-installer https://github.com/blacktop/ipsw-skill --path skill
+$skill-installer https://github.com/blacktop/ipsw-skill --path ipsw
 ```
 
 Or install manually:
@@ -66,10 +66,10 @@ Or install manually:
 git clone https://github.com/blacktop/ipsw-skill /tmp/ipsw-skill
 
 # User-wide
-mv /tmp/ipsw-skill/skill ~/.codex/skills/ipsw
+mv /tmp/ipsw-skill/ipsw ~/.codex/skills/ipsw
 
 # Project-specific
-mv /tmp/ipsw-skill/skill .codex/skills/ipsw
+mv /tmp/ipsw-skill/ipsw .codex/skills/ipsw
 ```
 
 > **Note**: Run Codex with `--enable skills` if skills aren't loading automatically.
@@ -102,7 +102,7 @@ Once installed, the agent will automatically use this skill for Apple RE tasks:
 
 ```
 ipsw-skill/
-├── skill/                      # Claude Code / Codex skill
+├── ipsw/                       # The skill (Claude Code / Codex / Gemini all read this)
 │   ├── SKILL.md                # Main skill instructions
 │   └── references/
 │       ├── dyld.md             # DSC analysis (a2s, xref, dump, str)
@@ -111,9 +111,6 @@ ipsw-skill/
 │       ├── macho.md            # Mach-O binary analysis
 │       ├── class-dump.md       # ObjC header dumping
 │       └── entitlements.md     # Entitlements database & queries
-├── extension/                  # Gemini CLI extension resources
-│   └── references/             # (same reference files)
-├── GEMINI.md                   # Gemini extension instructions
 ├── gemini-extension.json       # Gemini extension config
 └── .claude-plugin/
     └── marketplace.json        # Claude marketplace config

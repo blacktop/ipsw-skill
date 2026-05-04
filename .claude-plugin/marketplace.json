@@ -12,8 +12,7 @@
       "name": "ipsw",
       "description": "Apple firmware and binary reverse engineering using the ipsw CLI tool",
       "source": "./",
-      "strict": false,
-      "skills": ["./skill"]
+      "skills": ["./ipsw"]
     }
   ]
 }

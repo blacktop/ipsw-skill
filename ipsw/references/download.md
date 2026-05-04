@@ -237,24 +237,29 @@ ipsw extract --kernel --json iPhone16,1_18.0_Restore.ipsw
 
 KDKs contain debug symbols and type information for kernel analysis.
 
-**List available KDKs:**
+**Download KDK for current host OS:**
 ```bash
-ipsw download kdk --list
+ipsw download kdk --host
 ```
 
-**Download specific KDK:**
+**Download KDK for specific build:**
 ```bash
-ipsw download kdk --version 13.0
+ipsw download kdk --build 24A335
 ```
 
-**Download latest KDK:**
+**Download latest KDK (and install via the .pkg):**
 ```bash
-ipsw download kdk --latest
+ipsw download kdk --latest --install
 ```
 
-After download, use with `ipsw ctfdump` for type analysis:
+**Download all available KDKs:**
 ```bash
-ipsw ctfdump /Library/Developer/KDKs/KDK_13.0/kernel.development task
+ipsw download kdk --all
+```
+
+After download, use with `ipsw kernel ctfdump` for type analysis:
+```bash
+ipsw kernel ctfdump /Library/Developer/KDKs/KDK_15.0_24A335.kdk/System/Library/Kernels/kernel.release.t6031 task
 ```
 
 ---
@@ -298,7 +303,11 @@ ipsw download tss --device iPhone16,1 --build 21A326
 
 **App Store IPAs (requires auth):**
 ```bash
-ipsw download ipa --bundle-id com.example.app
+# Bundle ID is positional
+ipsw download ipa com.example.app
+
+# Or search interactively
+ipsw download ipa --search twitter
 ```
 
 ---
