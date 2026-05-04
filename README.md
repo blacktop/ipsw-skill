@@ -2,7 +2,7 @@
 
 An AI agent skill for Apple firmware and binary reverse engineering using the [ipsw](https://github.com/blacktop/ipsw) CLI tool.
 
-Supports **Claude Code**, **Codex CLI**, and **Gemini CLI**.
+Supports **Claude Code**, **Codex CLI**, **Gemini CLI**, and **Pi (pi-coding-agent)**.
 
 ## What This Skill Provides
 
@@ -94,6 +94,16 @@ mv /tmp/ipsw-skill/ipsw ~/.gemini/antigravity/skills/ipsw
 mv /tmp/ipsw-skill/ipsw <workspace-root>/.agent/skills/ipsw
 ```
 
+### Pi (pi-coding-agent)
+
+```bash
+# Global (adds package to ~/.pi/agent/settings.json; clones to ~/.pi/agent/git/...)
+pi install https://github.com/blacktop/ipsw-skill
+
+# Project-local (adds package to ./.pi/settings.json; clones to ./.pi/git/...)
+pi install -l https://github.com/blacktop/ipsw-skill
+```
+
 ## Usage Examples
 
 Once installed, the agent will automatically use this skill for Apple RE tasks:
@@ -124,6 +134,7 @@ ipsw-skill/
 │       ├── class-dump.md       # ObjC header dumping
 │       └── entitlements.md     # Entitlements database & queries
 ├── gemini-extension.json       # Gemini extension config
+├── package.json                # Pi package manifest
 └── .claude-plugin/
     └── marketplace.json        # Claude marketplace config
 ```
