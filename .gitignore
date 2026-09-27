@@ -1,0 +1,7 @@
+# Codex requires its marketplace at .agents/plugins/marketplace.json; the global gitignore
+# excludes .agents/, so re-include only that file.
+!/.agents/
+/.agents/*
+!/.agents/plugins/
+/.agents/plugins/*
+!/.agents/plugins/marketplace.json

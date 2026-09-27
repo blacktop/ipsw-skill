@@ -1,312 +1,211 @@
 ---
 name: ipsw
-description: Use this skill when reverse-engineering Apple platforms with the ipsw CLI — analyzing iOS/macOS Mach-O binaries, disassembling functions inside dyld_shared_cache (DSC), dumping Objective-C/Swift headers from private frameworks, extracting kernelcaches, KEXTs, SEP, iBoot, or DeviceTree from IPSWs/OTAs, decompiling/querying sandbox profiles (SBPL), querying entitlements, symbolicating crashes/panics, diffing two firmware versions, mounting IPSW DMGs, or downloading Apple firmware. Triggers on iOS/macOS internals, kernel research, dyld_shared_cache, KEXT diffing, sandbox/Seatbelt profile analysis (SBPL/SBASM/sandboxd), capability/IOKit queries, entitlement lookup, class-dump, IMG4/AEA handling, or vulnerability research on Apple platforms.
+description: Reverse-engineers Apple firmware and binaries with the ipsw CLI. Inspects IPSWs and OTAs remotely or locally; extracts kernelcaches, dyld_shared_cache, exclave, SEP, and coprocessor firmware; disassembles and cross-references DSC dylibs, KEXTs, and Mach-Os; dumps and diffs ObjC/Swift headers; decompiles and queries sandbox profiles; searches entitlements; symbolicates crashes and panics; and diffs releases. Use for iOS/macOS internals, private frameworks, kernel or firmware research, and Apple security research, even when ipsw is not named.
+license: MIT
+metadata:
+  version: "2.0.0"
+  ipsw-version: "3.1.725-6-g6e0291a8f"
 ---
 
-# IPSW - Apple Reverse Engineering Toolkit
+# ipsw
 
-**Install:** `brew install blacktop/tap/ipsw` (Linux: see https://github.com/blacktop/ipsw#install)
+`ipsw` is one CLI for Apple firmware work, organized into command groups (`download`,
+`extract`, `dyld`, `kernel`, `macho`, `fw`, `sb`, `ent`, `diff`, `symbolicate`, `idev`, ...).
+Install it with `brew install blacktop/tap/ipsw` (other platforms: github.com/blacktop/ipsw
+releases). Remote and download commands need network access; `idev` needs a USB-connected
+device. This skill describes ipsw as of commit 6e0291a8f (after release 3.1.725); on 3.1.725
+and earlier, apply the "Older releases" table below. Flags change between releases:
+`ipsw version` shows the installed build, and `ipsw <group> <command> --help` is the source of
+truth. Commands marked 🚧 in `--help` are works in progress.
 
-## Choose Your Workflow
-
-| Goal | Start Here |
-|------|------------|
-| Download/extract firmware | [Firmware Acquisition](#firmware-acquisition) |
-| Reverse engineer userspace | [Userspace RE](#userspace-re-dyld_shared_cache) |
-| Analyze kernel/KEXTs | [Kernel Analysis](#kernel-analysis) |
-| Research entitlements | [Entitlements](#entitlements) |
-| Dump private API headers | [Class Dump](#class-dump) |
-| Analyze standalone binary | [Mach-O Analysis](#mach-o-analysis) |
-| Diff two IPSWs/OTAs | [Firmware Diffing](#firmware-diffing) |
-| Symbolicate a crash / panic | [Symbolication](#symbolication) |
-| Parse IMG4/AEA/iBoot/SEP | [Firmware Components](#firmware-components-img4-aea-iboot-sep) |
-| Decompile / query sandbox profiles | [Sandbox Profile Analysis](#sandbox-profile-analysis-sb) |
-| Inspect / mount an IPSW | [IPSW Inspection](#ipsw-inspection) |
-
----
-
-## Firmware Acquisition
+Examples use these shell variables (POSIX sh/bash/zsh syntax):
 
 ```bash
-# Download latest IPSW for device
-ipsw download ipsw --device iPhone16,1 --latest
-
-# Download with automatic kernel/DSC extraction
-ipsw download ipsw --device iPhone16,1 --latest --kernel --dyld
-
-# Extract components from local IPSW
-ipsw extract --kernel iPhone16,1_18.0_Restore.ipsw
-ipsw extract --dyld --dyld-arch arm64e iPhone16,1_18.0_Restore.ipsw
-
-# Remote extraction (no full download)
-ipsw extract --kernel --remote <IPSW_URL>
+IPSW=./iPhone18,1_26.4_23E246_Restore.ipsw   # local IPSW or OTA
+URL=https://updates.cdn-apple.com/...          # remote IPSW or OTA (see "Triage a release")
+DSC=./dyld_shared_cache_arm64e                 # main file of an extracted cache; subcaches beside it
+KC=./kernelcache.release.iPhone18,1            # extracted kernelcache
+DEVICE=iPhone18,1                              # any product type from `ipsw device-list`
 ```
 
-See [references/download.md](references/download.md) for device identifiers and advanced options.
+## Working rules
 
----
+These are where agents most often go wrong with ipsw.
 
-## Userspace RE (dyld_shared_cache)
+1. **Make every choice explicit on the command line.** Without a terminal, ipsw cannot prompt:
+   the command stops with an error such as "use --confirm to proceed unattended" (older
+   releases skip the step silently; see "Older releases" below). Pass the selection instead:
+   - A short dylib name that matches several images (`UIKit`, `SwiftUI`, `SpringBoard`) fails.
+     Pass the full install path, found with
+     `ipsw dyld info --dylibs --json "$DSC" | jq -r '.dylibs[].name' | grep -i <name>`.
+   - Fat Mach-Os need `--arch arm64e`; multi-device IPSWs need `--device <product-type>`.
+   - Downloads and payload searches need `-y`/`--confirm` (`download`, `ota extract --pattern`).
+   - `ipsw mount` blocks until Ctrl+C: pass `--detach`, then run the `hdiutil detach …`
+     command it prints.
+   - `idev crash pull` needs a path or `--all`; `idev syslog` streams forever unless given
+     `-t <seconds>`.
+2. **Read remotely before downloading.** A current IPSW is 10–15 GB, but `--remote` commands
+   fetch only what they need: `info --remote` (KB), `extract --kernel --remote` (~75 MB),
+   `fw <component> --remote` (MBs to tens of MB). A remote `extract --dyld` is several GB.
+   Download whole images only for filesystem-wide work.
+3. **Keep large output out of the conversation.** Prefer `--json | jq`, write to files with
+   `-o`/`--output`, and read the head or counts first. Dumps of a whole DSC or kernel run to
+   millions of lines.
+4. **Expect one-time costs and plan for them:**
+   - First `dyld disass`/`xref` on a cache builds `<DSC>.a2s` (minutes, ~1.5 GB).
+   - `sb graph export` takes ~30 s and writes ~500 MB, then makes queries take ~3 s.
+   - Filesystem scans (`ent --fs`, `macho search <IPSW>`, `diff`) unpack and decrypt a
+     multi-GB DMG into the current directory.
+   - The first `download appledb` clones ~600 MB into `~/.config/ipsw/appledb`; `--no-update`
+     (also on `download tss`) reuses the existing checkout.
+5. **Verify before reporting.** Cross-check an address↔symbol result with the opposite
+   command (`a2s` vs `symaddr`), confirm a crash log's build matches the firmware before
+   trusting symbolication, and list extraction output (or use `extract --json`) rather than
+   assuming file names.
 
-**macOS DSC location:**
-- macOS 14+: `/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e`
-- macOS 13 and earlier: `/System/Library/dyld/dyld_shared_cache_arm64e`
+## Choose a workflow
 
-Examples below assume:
-```bash
-export DSC=/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_arm64e
-```
+| Task | Start with | Details |
+|------|-----------|---------|
+| Find, read remotely, download, or extract firmware | `ipsw download appledb ... --urls`, `ipsw extract` | `references/download.md` |
+| Coprocessor, exclave, iBoot, SEP, IMG4, AEA, OTA internals | `ipsw fw <component>`, `ipsw img4`, `ipsw ota` | `references/firmware.md` |
+| Userspace code in the dyld_shared_cache | `ipsw dyld a2s / disass / xref` | `references/dyld.md` |
+| ObjC/Swift interfaces of private frameworks | `ipsw class-dump`, `ipsw swift-dump` | `references/class-dump.md` |
+| Standalone binaries: info, entitlements, signing | `ipsw macho info / disass / search` | `references/macho.md` |
+| Kernelcache: KEXTs, symbols, C++ classes, syscalls | `ipsw kernel ...` | `references/kernel.md` |
+| Sandbox profiles and capability questions | `ipsw sb ...` | `references/sandbox.md` |
+| Entitlement search across a firmware image | `ipsw ent ...` | `references/entitlements.md` |
+| What changed between two builds | `ipsw diff`, `--diff`/`--delta` variants | `references/diffing.md` |
+| Crash logs and panics | `ipsw symbolicate` | `references/symbolication.md` |
+| A USB-connected iPhone/iPad | `ipsw idev ...` | `references/device.md` |
 
-### Essential Commands
-
-| Command | Purpose |
-|---------|---------|
-| `dyld a2s <DSC> <ADDR>` | Address → symbol (triage crash LR/PC) |
-| `dyld symaddr <DSC> <SYM> --image <DYLIB>` | Symbol → address |
-| `dyld disass <DSC> --vaddr <ADDR>` | Disassemble at address |
-| `dyld disass <DSC> --symbol <SYM> --image <DYLIB>` | Disassemble by symbol |
-| `dyld xref <DSC> <ADDR> --all` | Find all references to address |
-| `dyld dump <DSC> <ADDR> --size 256` | Dump raw bytes at address |
-| `dyld str <DSC> "pattern" --image <DYLIB>` | Search strings |
-| `dyld objc --class <DSC> --image <DYLIB>` | List ObjC classes |
-| `dyld extract <DSC> <DYLIB> -o ./out/` | Extract dylib for external tools |
-
-### Common Workflow
-
-```bash
-# 1. Resolve address from crash/trace
-ipsw dyld a2s $DSC 0x1bc39e1e0
-# → -[SomeClass someMethod:] + 0x40
-
-# 2. Disassemble around that address
-ipsw dyld disass $DSC --vaddr 0x1bc39e1e0
-
-# 3. Find who calls this function
-ipsw dyld xref $DSC 0x1bc39e1a0 --all
-
-# 4. Extract string/data referenced in disassembly
-ipsw dyld dump $DSC 0x1bc39e200 --size 64
-```
-
-See [references/dyld.md](references/dyld.md) for complete DSC commands.
-
----
-
-## Kernel Analysis
+## Triage a release without downloading it
 
 ```bash
-# List all KEXTs
-ipsw kernel kexts kernelcache.release.iPhone16,1
-
-# Extract specific KEXT
-ipsw kernel extract kernelcache sandbox --output ./kexts/
-
-# Dump syscalls
-ipsw kernel syscall kernelcache
-
-# Diff KEXTs between versions
-ipsw kernel kexts --diff kernelcache_17.0 kernelcache_18.0
+URL="$(ipsw download appledb --os iOS --device "$DEVICE" --latest --release --urls | head -1)"
+ipsw info --remote "$URL"                          # version, build, devices, CPU
+ipsw info --remote --list "$URL"                   # every file in the IPSW, with sizes
+ipsw fw exclave --remote "$URL" --info             # exclave bundle sections (~50 MB fetched)
+KC="$(ipsw extract --kernel --remote --json -o ./fw/ "$URL" | jq -r 'keys[0]')"   # just the kernelcache
+ipsw dtree --remote "$URL" --summary               # DeviceTree identity
 ```
 
-See [references/kernel.md](references/kernel.md) for KEXT extraction and kernel analysis.
+`dl` and `db` are aliases for `download` and `appledb`. `--latest` alone means the newest build
+on *any* channel (often a beta): add `--release`, `--beta`, or `--rc`, or pin `--build <BUILD>`
+/ `--version <X.Y>`; `--type ota` returns OTA URLs. `ipsw download ipsw --device "$DEVICE"
+--latest --urls` gives the newest signed public IPSW without touching AppleDB.
 
----
-
-## Entitlements
+## Userspace: from an address to an explanation
 
 ```bash
-# Single binary entitlements
-ipsw macho info --ent /path/to/binary
-
-# Build searchable database from IPSW
-ipsw ent --sqlite ent.db --ipsw iOS18.ipsw
-
-# Query database
-ipsw ent --sqlite ent.db --key "com.apple.private.security.no-sandbox"
-ipsw ent --sqlite ent.db --key "platform-application"
-ipsw ent --sqlite ent.db --key "com.apple.private.tcc.manager"
+ipsw dyld a2s "$DSC" 0x18ebfa9c8                                      # symbol + offset
+ipsw dyld disass "$DSC" --vaddr 0x18ebfa9a8 --count 60                 # first run builds the .a2s cache
+ipsw dyld xref "$DSC" 0x18ebfa9a8 --imports                            # callers in this and dependent dylibs
+ipsw dyld imports "$DSC" /System/Library/PrivateFrameworks/SpringBoardServices.framework/SpringBoardServices
+ipsw class-dump "$DSC" /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore \
+  --class '^UIApplication$' --re -V | grep -B1 'BackgroundTask'
 ```
 
-See [references/entitlements.md](references/entitlements.md) for common entitlements and query patterns.
+`--re` (which requires `-V`/`--verbose`) prints each method's implementation address as a
+`// 0x…` comment on the line above the method, so keep one line of leading context when
+filtering. The addresses feed back into `dyld disass --vaddr`. UIKit's classes live in
+`UIKitCore`; `UIKit.framework/UIKit` is a shim with no ObjC.
 
----
-
-## Class Dump
-
-Dump Objective-C headers from binaries or dyld_shared_cache:
+## Kernel: name, find, disassemble
 
 ```bash
-# Dump all headers from framework in DSC
-ipsw class-dump $DSC SpringBoardServices --headers -o ./headers/
-
-# Dump specific class
-ipsw class-dump $DSC Security --class SecKey
-
-# Filter by pattern
-ipsw class-dump $DSC UIKit --class 'UIApplication.*' --headers -o ./headers/
-
-# Include runtime addresses (for hooking)
-ipsw class-dump $DSC Security --re
-
-# Swift class-dump (separate command, same shape)
-ipsw swift-dump $DSC SwiftUI --headers -o ./headers/
+ipsw kernel version "$KC"
+mkdir -p ./syms && ipsw kernel symbolicate --signatures symbolicator/kernel --json -o ./syms/ "$KC"   # names for a stripped kernel
+ipsw kernel cpp "$KC" --class IOSurfaceRootUserClient --inheritance                 # C++ classes (no ObjC in kernels)
+ipsw kernel syscall "$KC"                                                           # also: mach, mig, kexts
+ipsw macho disass "$KC" --fileset-entry com.apple.kernel --vaddr 0xfffffe000ab90040 --count 40
 ```
 
-See [references/class-dump.md](references/class-dump.md) for filtering and output options.
+Signatures come from `git clone https://github.com/blacktop/symbolicator`; without
+`--signatures`, symbolicate still names syscalls, Mach traps, MIG routines, and C++ methods.
+Release kernels are stripped, so disassemble by `--vaddr`. Name KEXTs by full bundle ID: short names match by suffix
+(`IOKit` resolves to `com.apple.driver.ASIOKit`).
 
----
-
-## Mach-O Analysis
+## What changed between two builds
 
 ```bash
-# Full binary info
-ipsw macho info /path/to/binary
-
-# Disassemble function
-ipsw macho disass /path/to/binary --symbol _main
-
-# Get entitlements and signature
-ipsw macho info --ent /path/to/binary
-ipsw macho info --sig /path/to/binary
+ipsw dyld info --dylibs --delta "$OLD_DSC" "$NEW_DSC"          # added/removed/re-versioned dylibs
+ipsw class-dump "$NEW_DSC" <DYLIB_PATH> --diff "$OLD_DSC"       # ObjC API diff (new first, --diff old)
+ipsw swift-dump "$NEW_DSC" <DYLIB_PATH> --diff "$OLD_DSC" > api.diff.md   # Swift API diff (long)
+ipsw kernel kexts --diff "$OLD_KC" "$NEW_KC"
+ipsw sb opts --diff "$OLD_KC" "$NEW_KC"
+ipsw diff "$OLD_IPSW" "$NEW_IPSW" -o ./diff/ --markdown --starts --ent   # full report (slow, local IPSWs)
 ```
 
-See [references/macho.md](references/macho.md) for complete Mach-O commands.
+See `references/diffing.md` for the patch-hunting checklist.
 
----
-
-## Firmware Diffing
-
-Compare two IPSWs, OTAs, or patched OTA directories — surfaces added/removed binaries, entitlement changes, function-starts deltas, and KEXT diffs.
+## Capabilities: entitlements and sandbox
 
 ```bash
-# Diff two IPSWs (markdown report)
-ipsw diff old.ipsw new.ipsw --output ./diff/ --markdown
-
-# Include firmware components (iBoot, SEP, etc.) and launchd configs
-ipsw diff old.ipsw new.ipsw --fw --launchd --output ./diff/ --markdown
-
-# Diff with KDKs for kernel symbol resolution
-ipsw diff old.ipsw new.ipsw --output ./diff/ --markdown \
-  --kdk <OLD_KDK>/System/Library/Kernels/kernel.release.t6031 \
-  --kdk <NEW_KDK>/System/Library/Kernels/kernel.release.t6031
-
-# Entitlement-only diff
-ipsw diff old.ipsw new.ipsw --ent --output ./diff/
-
-# Diff two OTAs (macOS 14+ AEA-encrypted; supply key DB)
-ipsw diff old.ota new.ota --key-db keys.json --output ./diff/ --markdown
+ipsw ent --fs --has com.apple.private.security.no-sandbox --file-only "$IPSW"   # no database needed
+ipsw sb graph export "$KC" -O graph.json
+ipsw sb query iokit-open IOSurfaceRootUserClient --graph graph.json -O json \
+  | jq -r '.matches[] | select(.decision=="allow") | .profile' | sort -u
 ```
 
----
-
-## Symbolication
+## Crashes and panics
 
 ```bash
-# Symbolicate a panic / crash log against an IPSW
-ipsw symbolicate panic-full-2024-03-21.ips iPhone16,1_18.0_Restore.ipsw
-
-# Show disassembly around panic frames
-ipsw symbolicate panic.ips firmware.ipsw --peek --peek-count 10
-
-# Symbolicate against a DSC instead
-ipsw symbolicate crash.ips $DSC
+ipsw symbolicate panic-full-<date>.ips "$IPSW" --peek       # kernel + userspace frames, with disassembly
+ipsw symbolicate crash.ips "$DSC" --unslide                  # userspace, addresses usable in static tools
 ```
 
----
-
-## Firmware Components (IMG4, AEA, iBoot, SEP)
-
-For Apple firmware containers — IMG4/IM4P/IM4M, AEA1-encrypted DMGs, iBoot, SEP, AOP, DCP, baseband, and trust caches:
-
-```bash
-# IMG4 / IM4P / IM4M operations
-ipsw img4 info my.img4
-ipsw img4 extract --im4p my.img4 --output ./             # IM4P payload (decompressed)
-ipsw img4 extract --im4p --im4m --im4r my.img4 -o ./     # All components
-
-# Firmware sub-binaries (iBoot, exclave, AOP, GPU, DCP, baseband)
-ipsw fw iboot iBoot.img4
-ipsw fw aea --info encrypted.dmg.aea     # AEA1 DMG metadata
-ipsw fw aea --key encrypted.dmg.aea       # Pull decryption key
-ipsw fw tc TrustCache.img4                # Dump trust cache entries
-```
-
-See `ipsw img4 --help` and `ipsw fw --help` for the full list of subcommands.
-
----
-
-## Sandbox Profile Analysis (`sb`)
-
-Decode and query Apple sandbox profiles compiled into a kernelcache. Useful for capability analysis ("which profiles can open IOSurface?"), attack-surface mapping, and tracking sandbox changes between releases.
-
-```bash
-# List every profile in a kernelcache
-ipsw sb list kernelcache.release.iPhone18,1
-
-# Decompile one profile to SBPL (Sandbox Profile Language)
-ipsw sb dec kernelcache.release.iPhone18,1 com.apple.WebKit.WebContent -O WebContent.sb
-
-# Diff sandbox operations between two kernels (find new/removed checks)
-ipsw sb opts --diff kernelcache_old kernelcache_new
-
-# Build the cross-profile graph once, then query repeatedly (queries become sub-second)
-ipsw sb graph export kernelcache.release.iPhone18,1 -O graph.json
-
-# Capability queries against the graph
-ipsw sb query iokit-open IOSurfaceRootUserClient --graph graph.json
-ipsw sb query path-write /private/var/mobile/tmp --graph graph.json
-ipsw sb query syscall mmap --graph graph.json
-ipsw sb query mach-lookup com.apple.mobilegestalt.xpc --graph graph.json
-```
-
-Available query subcommands: `iokit-open`, `path-read`, `path-write`, `syscall`, `sysctl`, `mach-lookup`, `mach-register`, `preference`, `notification`, `cypher`.
-
-See [references/sandbox.md](references/sandbox.md) for the full sandbox toolkit.
-
----
-
-## IPSW Inspection
-
-```bash
-# Summarize an IPSW/OTA (devices, builds, file list)
-ipsw info iPhone16,1_18.0_Restore.ipsw
-ipsw info --list iPhone16,1_18.0_Restore.ipsw       # full file listing
-ipsw info --remote <IPSW_URL>                        # without downloading
-
-# Mount the filesystem / system / dyld_shared_cache DMG
-ipsw mount fs iPhone16,1_18.0_Restore.ipsw           # filesystem
-ipsw mount sys iPhone16,1_18.0_Restore.ipsw          # system
-ipsw mount exc iPhone16,1_18.0_Restore.ipsw          # dyld_shared_cache (cryptex)
-
-# Parse the DeviceTree
-ipsw dtree iPhone16,1_18.0_Restore.ipsw --summary
-ipsw dtree iPhone16,1_18.0_Restore.ipsw --json | jq '.["device-tree"]["compatible"]'
-```
-
-For AEA-encrypted DMGs (macOS 14+), pass `--key-db keys.json` or `--pem-db pem.json`.
-
----
+The firmware must be the exact build in the log's header (`head -1 <log>.ips | jq -r .os_version`).
+Without local firmware, `--server <URL>` queries an `ipswd` symbol server; pass its bearer token
+through `IPSW_SYMBOLICATE_API_TOKEN` (see `references/symbolication.md`).
 
 ## Pitfalls
 
-1. **Symbol cache must be primed.** First `dyld a2s`/`symaddr` on a DSC creates `<dsc>.a2s`. Until then lookups appear to "find nothing". Run `dyld a2s $DSC <any-addr>` once before scripting bulk lookups.
-2. **AEA-encrypted IPSWs/OTAs.** Modern macOS OTAs can ship as AEA1 archives. Pass `--key-val <base64>` or `--key-db keys.json` to commands that need to read them (`diff`, `extract`, `fw aea`).
-3. **Always pass `--image <DYLIB>`** for DSC ops. Without it, ipsw walks every dylib map — 10x+ slower.
-4. **Multi-arch DSCs need `--dyld-arch`.** Without it, extraction may pick the wrong slice (arm64 vs arm64e) silently.
+- `dyld symaddr` and `dyld disass --symbol` match exact names, not regexes; use
+  `symaddr --in <json>` for patterns. The symbol-lookup hint for `disass` is `--symbol-image`
+  (`--image` selects whole dylibs to disassemble).
+- ObjC instance-method names start with `-` and parse as flags: put them after `--`
+  (`ipsw dyld symaddr "$DSC" --image <DYLIB> -- '-[UIApplication endBackgroundTask:]'`).
+- `dyld str` searches the whole cache and has no per-image filter.
+- `dyld xref --all` disassembles every image (very slow); start without it.
+- `extract --dyld` without `--dyld-arch` extracts every architecture in the image.
+- `class-dump --re` requires `-V`; the addresses print as `// 0x…` lines above each method.
+- In `sb` commands, `-o` is the operations list and `-O` is output.
+- `download git` and `device-info` take `--product` / `--prod`, not a positional argument.
 
----
+## Older releases (ipsw 3.1.725 and earlier)
 
-## Reference Files
+Check `ipsw version`. These releases behave differently; use the workaround on the right:
 
-- [references/download.md](references/download.md) - Firmware download, device IDs, extraction
-- [references/dyld.md](references/dyld.md) - Complete DSC commands (a2s, xref, dump, str, extract)
-- [references/kernel.md](references/kernel.md) - Kernel and KEXT analysis
-- [references/entitlements.md](references/entitlements.md) - Entitlements database and queries
-- [references/class-dump.md](references/class-dump.md) - ObjC header dumping
-- [references/macho.md](references/macho.md) - Mach-O binary analysis
-- [references/sandbox.md](references/sandbox.md) - Sandbox profiles (`sb`): decompile, diff, graph, capability queries
+| Behavior in 3.1.725 and earlier | Workaround |
+|---|---|
+| Prompts without a terminal skip the step and exit 0 (`download appledb/ota` "Continue?", `ota extract` payload search) | Always pass `--confirm`/`-y`; check the output rather than the exit status |
+| `download tss --signed` exits 0 when unsigned; no `--no-update` | Match `Is still being signed` / `No longer being signed` in the output |
+| `download kdk` with no selector exits 0 doing nothing | Pass `--host`, `--build`, `--latest`, or `--all` |
+| `dyld a2f <DSC> <ADDR>` fails with `failed to find image containing stub target` | `echo <ADDR> \| ipsw dyld a2f "$DSC" --in /dev/stdin` |
+| `dyld webkit --diff` rejects its second argument | `ipsw dyld webkit --json "$DSC" \| jq -r .version` for each cache |
+| `dyld info --dylibs --diff/--delta` has no `--json`; `--diff` and `kernel kexts --diff` print ANSI even with `--no-color` | Use `--delta` (markdown) and the `kexts --json` recipe in `references/kernel.md` |
+| `class-dump --diff` ignores `@property` changes | Dump the class from both caches and `diff -u` |
+| `kernel symbolicate -o <dir>` fails if `<dir>` does not exist | `mkdir -p <dir>` first |
+| `fw exclave/dcp/c1 --info` leave fetched firmware under `./<BUILD>__<DEVICE>/` | Run from a scratch directory |
+| `extract --remote --kbag` downloads every IM4P whole (~150 MB) | Budget for it, or extract only the IM4Ps you need |
+| `extract` has no `--json-format artifacts` | Use plain `--json`: `jq -r 'keys[0]'` after `--kernel`, `.[]` after `--sptm`/`--pattern` |
+| `ota ls --payload --json` prints a banner before the JSON | `sed -n '/^\[/,$p'` before `jq` |
+| `dyld search objc` prints a `relative method selectors` error for one image | Ignore it; the other results are valid |
+| `device-info` and `download git` silently ignore positional arguments | Use `--prod` / `--product` |
 
-## Tips
+## Reference files
 
-1. **JSON output:** Most commands support `--json` for scripting (e.g. `ipsw dyld info --dylibs --json $DSC | jq -r '.images[].name'`).
-2. **Device IDs:** `ipsw device-list` lists every known identifier; `ipsw device-info iPhone16,1` describes a specific one.
+Read the one that matches the task; each starts with a table of contents.
+
+- `references/download.md`: finding URLs, remote reads, downloads, extraction, AEA keys, config
+- `references/firmware.md`: `info`, `mount`, `dtree`, `fw` components, IMG4, AEA, OTA payloads
+- `references/dyld.md`: DSC addresses, disassembly, xrefs, imports, soft links, extraction
+- `references/class-dump.md`: ObjC/Swift dumping, header generation, API diffs
+- `references/macho.md`: Mach-O info, entitlements, signatures, search, lipo/sign/patch
+- `references/kernel.md`: kernel symbols, C++ classes, syscalls/MIG, KEXT extraction, KDK types
+- `references/sandbox.md`: profile decompilation, capability queries, sandbox diffs
+- `references/entitlements.md`: entitlement search and databases
+- `references/diffing.md`: release diffs and the patch-hunting checklist
+- `references/symbolication.md`: crash and panic symbolication
+- `references/device.md`: `idev` commands for USB-connected devices

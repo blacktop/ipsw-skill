@@ -1,190 +1,87 @@
-# Entitlements Analysis Reference
+# Entitlements Research
 
-Complete reference for analyzing and searching entitlements with ipsw.
+## Contents
+- [One binary](#one-binary)
+- [Search a firmware image without a database](#search-a-firmware-image-without-a-database)
+- [Build a database](#build-a-database)
+- [Query the database](#query-the-database)
+- [Track changes between releases](#track-changes-between-releases)
 
-## Table of Contents
-- [Single Binary Entitlements](#single-binary-entitlements)
-- [Entitlements Database](#entitlements-database)
-- [Database Queries](#database-queries)
-- [Common Entitlements](#common-entitlements)
+## One binary
 
----
-
-## Single Binary Entitlements
-
-**Dump entitlements from binary:**
 ```bash
-ipsw macho info --ent /path/to/binary
+ipsw macho info --ent "$BIN"          # plist
+ipsw macho info --ent-der "$BIN"      # DER
 ```
 
-**Dump DER-encoded entitlements:**
+For a binary inside a DSC, extract it first (`ipsw dyld extract`) or use the database below.
+Fat macOS binaries need `--arch` (see `macho.md`).
+
+## Search a firmware image without a database
+
+`--fs` scans the Mach-Os in an IPSW's filesystem directly: good for one-off questions.
+
 ```bash
-ipsw macho info --ent-der /path/to/binary
+# Binaries that have both entitlements
+ipsw ent --fs --has com.apple.private.security.no-sandbox,platform-application --file-only "$IPSW"
+
+# Binaries with one entitlement but not another
+ipsw ent --fs --has com.apple.private.tcc.allow --without com.apple.private.tcc.manager "$IPSW"
+
+# Machine-readable
+ipsw ent --fs --has com.apple.private.security.no-sandbox --format jsonl "$IPSW"
 ```
 
-**Check for specific entitlement:**
+Scanning the filesystem unpacks (and, for AEA images, decrypts) the filesystem DMG into the
+current directory and mounts it under `/tmp` on macOS: expect several GB of temporary disk
+use per run. Run it from a directory with space. For repeated questions, build a database once.
+
+## Build a database
+
 ```bash
-ipsw macho info --ent /path/to/binary | grep "platform-application"
+ipsw ent --sqlite ent.db --ipsw "$IPSW"
+ipsw ent --sqlite ent.db --ipsw a.ipsw --ipsw b.ipsw        # one --ipsw per file
+ipsw ent --sqlite ent.db --input ./extracted_binaries/      # a folder of Mach-Os
+ipsw ent --sqlite ent.db --ipsw new.ipsw --replace --dry-run   # preview replacing an older build of the same version
 ```
 
----
+`--ipsw` takes one file per flag: a shell glob such as `--ipsw *.ipsw` breaks as soon as it
+matches two files. Generate the flags instead:
 
-## Entitlements Database
-
-Build a searchable database of entitlements across multiple IPSWs.
-
-**Create SQLite database:**
 ```bash
-ipsw ent --sqlite entitlements.db --ipsw iPhone16,1_18.0_Restore.ipsw
+set --; for f in ./*.ipsw; do set -- "$@" --ipsw "$f"; done
+ipsw ent --sqlite ent.db "$@"
 ```
 
-**Add multiple IPSWs:**
+PostgreSQL works the same way with `--pg-host`, `--pg-user`, `--pg-database` (and
+`--pg-password`, `--pg-sslmode`).
+
+## Query the database
+
+Key, value, and file arguments are patterns.
+
 ```bash
-ipsw ent --sqlite entitlements.db --ipsw *.ipsw
+ipsw ent --sqlite ent.db --key com.apple.private.security.no-sandbox
+ipsw ent --sqlite ent.db --key 'com.apple.private.tcc' --version 27.0
+ipsw ent --sqlite ent.db --value LockdownMode
+ipsw ent --sqlite ent.db --file WebContent            # every entitlement of matching files
+ipsw ent --sqlite ent.db --key 'com.apple.private' --file-only --limit 500
+ipsw ent --sqlite ent.db --stats
 ```
 
-**Create PostgreSQL database:**
+`--limit` defaults to 100 results; raise it for broad keys.
+
+## Track changes between releases
+
 ```bash
-ipsw ent --pg-host db.example.com --pg-user postgres --ipsw *.ipsw
+ipsw ent --sqlite ent.db --ipsw old.ipsw --ipsw new.ipsw
+ipsw ent --sqlite ent.db --key 'com.apple.private' --version <OLD_VERSION> --limit 100000 > old.txt
+ipsw ent --sqlite ent.db --key 'com.apple.private' --version <NEW_VERSION> --limit 100000 > new.txt
+diff old.txt new.txt
 ```
 
-**From folder of Mach-O binaries:**
-```bash
-ipsw ent --sqlite entitlements.db --input ./extracted_binaries/
-```
+`ipsw diff old.ipsw new.ipsw --ent` adds per-binary entitlement changes to a full release
+diff (see `diffing.md`).
 
-**Replace existing builds (update database):**
-```bash
-ipsw ent --sqlite entitlements.db --ipsw new_version.ipsw --replace
-```
-
-**Dry run (preview without changes):**
-```bash
-ipsw ent --sqlite entitlements.db --ipsw new.ipsw --replace --dry-run
-```
-
----
-
-## Database Queries
-
-**Search by entitlement key:**
-```bash
-ipsw ent --sqlite entitlements.db --key platform-application
-```
-
-**Search by entitlement value:**
-```bash
-ipsw ent --sqlite entitlements.db --value LockdownMode
-```
-
-**Search by file name:**
-```bash
-ipsw ent --sqlite entitlements.db --file WebContent
-```
-
-**Filter by iOS version:**
-```bash
-ipsw ent --sqlite entitlements.db --key com.apple.private.security.sandbox --version 18.0
-```
-
-**Limit results:**
-```bash
-ipsw ent --sqlite entitlements.db --key sandbox --limit 100
-```
-
-**Get statistics:**
-```bash
-ipsw ent --sqlite entitlements.db --stats
-```
-
----
-
-## Common Entitlements
-
-### Security & Privileges
-
-| Entitlement | Description |
-|-------------|-------------|
-| `platform-application` | App runs as platform binary |
-| `com.apple.private.security.no-sandbox` | Exempt from sandbox |
-| `com.apple.private.skip-library-validation` | Skip library signature validation |
-| `com.apple.rootless.install` | Can modify SIP-protected files |
-| `com.apple.rootless.storage.TCC` | Access TCC database |
-
-### Hardware & System
-
-| Entitlement | Description |
-|-------------|-------------|
-| `com.apple.developer.kernel.*` | Kernel-related capabilities |
-| `com.apple.private.amfi.*` | AMFI bypass capabilities |
-| `com.apple.private.memorystatus` | Memory management |
-| `com.apple.private.iokit-user-client-class` | IOKit user client access |
-
-### Data & Privacy
-
-| Entitlement | Description |
-|-------------|-------------|
-| `com.apple.private.tcc.manager` | TCC database management |
-| `com.apple.private.tcc.allow` | TCC bypass for specific services |
-| `keychain-access-groups` | Keychain access |
-| `com.apple.private.MobileContainerManager.allowed` | Container access |
-
-### Networking
-
-| Entitlement | Description |
-|-------------|-------------|
-| `com.apple.private.network.socket-access` | Raw socket access |
-| `com.apple.private.network.restricted.ports` | Bind to privileged ports |
-| `com.apple.private.necp.match` | Network extension control |
-
----
-
-## Research Patterns
-
-**Find all platform binaries:**
-```bash
-ipsw ent --sqlite ent.db --key platform-application
-```
-
-**Find sandbox escapes:**
-```bash
-ipsw ent --sqlite ent.db --key "com.apple.private.security.no-sandbox"
-ipsw ent --sqlite ent.db --key "com.apple.private.security.sandbox"
-```
-
-**Find TCC bypasses:**
-```bash
-ipsw ent --sqlite ent.db --key "com.apple.private.tcc"
-```
-
-**Find kernel capabilities:**
-```bash
-ipsw ent --sqlite ent.db --key "com.apple.developer.kernel"
-ipsw ent --sqlite ent.db --key "com.apple.private.kernel"
-```
-
-**Track entitlement changes between versions:**
-```bash
-# Build databases for each version
-ipsw ent --sqlite ent_17.0.db --ipsw iOS17.0.ipsw
-ipsw ent --sqlite ent_17.1.db --ipsw iOS17.1.ipsw
-
-# Query and compare
-ipsw ent --sqlite ent_17.0.db --key "sandbox" > ent_17.0.txt
-ipsw ent --sqlite ent_17.1.db --key "sandbox" > ent_17.1.txt
-diff ent_17.0.txt ent_17.1.txt
-```
-
-**Find new private entitlements:**
-```bash
-ipsw ent --sqlite ent.db --key "com.apple.private" --version 18.0
-```
-
----
-
-## Tips
-
-1. **Build comprehensive database**: Include multiple iOS versions to track entitlement evolution
-2. **Focus on private entitlements**: `com.apple.private.*` often indicates interesting capabilities
-3. **Check file context**: Match entitlements with binary functionality for attack surface analysis
-4. **Cross-reference with sandbox**: Entitlements often correlate with sandbox profiles
+Pair entitlement findings with sandbox queries (`sandbox.md`): an entitlement often only
+matters when the process's sandbox profile also permits the operation.

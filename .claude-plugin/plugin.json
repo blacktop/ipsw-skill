@@ -1,0 +1,14 @@
+{
+  "name": "ipsw",
+  "version": "2.0.0",
+  "description": "Apple firmware and binary reverse engineering with the ipsw CLI",
+  "author": {
+    "name": "blacktop",
+    "url": "https://github.com/blacktop"
+  },
+  "homepage": "https://github.com/blacktop/ipsw-skill",
+  "repository": "https://github.com/blacktop/ipsw-skill",
+  "license": "MIT",
+  "keywords": ["ipsw", "apple", "ios", "macos", "firmware", "reverse-engineering", "dyld_shared_cache", "kernelcache"],
+  "skills": "./ipsw"
+}
